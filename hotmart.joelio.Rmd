@@ -1,0 +1,353 @@
+---
+title: "Untitled"
+author: "joelio Marinho"
+date: "2022-11-17"
+output:
+   rmdformats::material:
+    highlight: kate
+    self_contained: true
+    code_folding: show
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+	             cache = FALSE,
+               prompt = FALSE,
+               tidy = FALSE,
+               comment = NA,
+               message = FALSE,
+               warning = FALSE)
+```
+
+```{r}
+library(DBI)
+library(tidyquant)
+library(dplyr)
+library(knitr)
+library(data.table)
+library(highcharter)
+library(plotly)
+```
+
+```{r}
+cn <-dbConnect(drv  = RMySQL::MySQL(),
+                username = "admin", 
+                password = "0WHPq8U2yJ9JgHVjsRBM", 
+                host     ="interview-2.ck1h5ksgzpiq.us-east-1.rds.amazonaws.com", 
+                port     = 3306, 
+                dbname   = "innodb")
+```
+
+# Descrição
+
+Toda empresa tem um sistema para gerenciar suas vendas. Na Hotmart não é diferente, ela possui um sistema paga gerenciar as vendas de seus produtos, onde nela é organizado de forma bem clara informando quem produziu o conteúdo, quando produziu, quem comprou, por onde foi feita a compra, a data da compra e muito mais. Através disso, fizemos uma análise encima desses dados para encontrar padrões entre eles.
+
+# Conhecendo os dados.
+
+```{r}
+df_inicial <- dbGetQuery(cn, "SELECT * FROM sales_data")
+```
+
+```{r}
+df_data <-df_inicial
+df_data["purchase_date"] <- as.Date(df_data$purchase_date)
+```
+
+## Iniciando a base de dados
+Durante sua avaliação, você irá analisar dados referentes a uma amostra de compras
+feitas na Hotmart em 2016. Tratam-se de mais de `1.599.828 registros` de compras
+realizadas em nossa plataforma. Abaixo, nós iremos detalhar o que significa cada
+campo:
+
+  * `purchase_id:` Identificação da compra na Hotmart;
+  * `product_id:` Identificação do produto na Hotmart;
+  * `affiliate_id:` Identificação do afiliado na Hotmart;
+  * `producer_id:` Identificação do produtor na Hotmart;
+  * `buyer_id:` Identificação do comprador na Hotmart;
+  * `purchase_date:` Data e hora em que a compra foi realizada;
+  * `product_creation_date:` Data e hora em que o produto foi criado na Hotmart;
+  * `product_category:` categoria do produto na Hotmart. Exemplo: e-book,
+    software, curso online, e-tickets, etc.;
+  * `product_niche:` nicho de mercado que o produto faz parte. Exemplo:
+    educação, saúde e bem-estar, sexualidade, etc.;
+  * `purchase_value:` valor da compra. Esse dado, assim como nicho e categoria
+    foi codificado para manter a confidencialidade. O valor apresentado no
+    dataset é o z-score do valor real;
+  * `affiliate_commission_percentual:` percentual de comissão que o afiliado
+    receberá da compra;
+  * `purchase_device:` tipo de dispositivo utilizado no momento da compra, como:
+    Desktop, Mobile, Tablet, ou Outros;
+  * `purchase_origin:` endereço do site do qual a pessoa veio antes da compra. Por
+    exemplo, se uma pessoa veio do Facebook, Youtube, ou até mesmo de outra
+    página no site oficial do produto;
+  * `is_origin_page_social_network:` informa se essa compra veio de uma URL do
+    Facebook, Youtube, Instagram, Pinterest, ou Twitter
+
+<button class="btn btn-primary" data-toggle="collapse" data-target="#distp"> Visualize parte da tabela.</button>
+<div id="distp" class="collapse"> 
+```{r}
+df_data%>% head(10)%>% kable() 
+```
+</div>
+
+
+## Quantos venda contem a base de dados?
+```{r}
+df_inicial%>% n_distinct()
+```
+## Quantos produtos diferentes existe na base de dados?
+```{r}
+df_inicial$product_id%>% n_distinct()
+```
+## Quantos afiliados existe na base de dados?
+```{r}
+df_inicial$affiliate_id%>% n_distinct()
+```
+## Quantos compradores existe no sistema?
+```{r}
+df_inicial$buyer_id%>% n_distinct()
+```
+## Quantas categorias existem na base de dados?
+```{r}
+df_inicial$product_category %>% n_distinct()
+```
+# Vendas
+
+## PRODUTOS MAIS VENDIDOS
+
+```{r}
+df_produto_vendas <- df_inicial %>% group_by(producer_id,product_id) %>% count(name = "vendas_produto") %>% arrange(desc(vendas_produto))
+
+```
+Aqui veremos uma lista dos 10 produtos mais vendidos.
+```{r}
+df_produto_vendas%>% head(10)%>% kable() 
+```
+
+
+## QUANTIDADE DE VENDAS DE CADA PRODUTOR
+
+Como na base de dados não é fornecido os valores reais do produto, não sera possivel saber se os produtores que mais vendem são responsáveis pela maior parte do faturamento.
+```{r}
+df_produtor_vendas = df_inicial %>% group_by(producer_id) %>% count(name = "vendas_do_criador") %>% arrange(desc(vendas_do_criador))
+```
+
+
+```{r, out.width="100%"}
+fig_1 <- hchart(df_produtor_vendas%>% head(10), "column", hcaes(x = as.character(producer_id), y = vendas_do_criador), name = "novo clientes", color = "black") %>%
+  hc_title(text = "Quantos vendas cada produtor teve ao logo do tempo?") %>% 
+  hc_xAxis(title = list(text = "Produtor")) %>% 
+  hc_yAxis(title = list(text = "Quantidade de vendas")) 
+
+fig_1
+```
+#### o que percebemos atravez do grafico.
+
+ + Podemos perceber que a diferença de vendas entre os colocas é bem linear entre eles.
+ + Percebemos tambem que nem todos os produtos mais vendidos da tabela anteriar, não pertence aos vendedores com mais vendas.
+
+## Quantas vendas aconteceram através do afiliado e do produtor?
+```{r}
+df_quant_commission<- data.frame(Vendas = c("Afiliado", "Produtor"),quantidade = c(df_data %>% filter(affiliate_commission_percentual!= 0) %>% n_distinct(),df_data %>% filter(affiliate_commission_percentual== 0) %>% n_distinct()))
+```
+
+```{r, out.width="100%"}
+fig_2<- hchart(df_quant_commission, "column", hcaes(x = Vendas, y = quantidade), name = "Vendas", color = "black") %>%
+  hc_title(text = "Quantidade de clientes em relação as contas") %>% 
+  hc_yAxis(title = list(text = "Quantidade")) 
+
+fig_2
+```
+#### o que percebemos atravez do grafico.
+Podemos perceber que a quantidade de vendas de afiliados `27%` das vendas em relação as do produtor. Sendo assim, o um pouco mais de `70%` do faturamento da Hotmart vem atraves do proprios produtores do conteudo.
+
+# Clientes
+```{r}
+df_meses<-df_data
+df_meses['Meses']<-  month(df_data$purchase_date)
+```
+
+
+
+```{r}
+df_meses_jan<- df_meses%>% filter(Meses==1)
+df_meses_fev<- df_meses%>% filter(Meses==2)
+df_meses_mar<- df_meses%>% filter(Meses==3)
+df_meses_abr<- df_meses%>% filter(Meses==4)
+df_meses_mai<- df_meses%>% filter(Meses==5)
+df_meses_jun<- df_meses%>% filter(Meses==6)
+
+```
+
+```{r}
+df_clientes_n_fev <- subset(df_meses_fev, !(buyer_id %in% df_meses_jan$buyer_id))
+
+df_clientes_n_mar <- subset(df_meses_mar, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id)))
+
+df_clientes_n_abr <- subset(df_meses_abr, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_mar$buyer_id)))
+
+df_clientes_n_mai <- subset(df_meses_mai, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_mar$buyer_id,df_meses_abr$buyer_id)))
+
+df_clientes_n_jun <- subset(df_meses_jun, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_mar$buyer_id,df_meses_abr$buyer_id,df_meses_mai$buyer_id)))
+```
+
+
+```{r}
+clientes_novos <- bind_rows(df_clientes_n_fev ,df_clientes_n_mar,df_clientes_n_abr,df_clientes_n_mai,df_clientes_n_jun)
+clientes_novos_count <- clientes_novos%>% group_by(Meses) %>% count(name = "Quantidade")
+
+```
+
+## Quantos clientes novos surgiram ao longo dos meses?
+Para fazer essa avaliação, o mês base que foi utilizado foi o mês de janeiro.
+
+```{r}
+clientes_novos_count %>% kable() 
+```
+
+
+```{r, out.width="100%"}
+fig_3 <- hchart(clientes_novos_count, "column", hcaes(x = c('fevereiro','março','abril','maio','junho'), y = Quantidade), name = "novo clientes", color = "blue") %>%
+  hc_title(text = "Quantos clientes novos surgiram ao longo do tempo?") %>% 
+  hc_xAxis(title = list(text = "Mês")) %>% 
+  hc_yAxis(title = list(text = "Quantidade de clientes novos")) 
+
+fig_3
+```
+Observamos que a tacha de clientes novos ao longo dos meses e bem estável.
+
+
+## Quantos clientes so fizeram compras em apenas um unico mês?
+```{r}
+df_clientes_s_fev <- subset(df_meses_jan, !(buyer_id %in% df_meses_fev$buyer_id))
+
+df_clientes_s_mar <- subset(df_meses_fev, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_mar$buyer_id)))
+
+df_clientes_s_abr <- subset(df_meses_mar, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_abr$buyer_id)))
+
+df_clientes_s_mai <- subset(df_meses_abr, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_mar$buyer_id,df_meses_mai$buyer_id)))
+
+df_clientes_s_jun <- subset(df_meses_mai, !(buyer_id %in% c(df_meses_jan$buyer_id,df_meses_fev$buyer_id,df_meses_mar$buyer_id,df_meses_abr$buyer_id,df_meses_jun$buyer_id)))
+```
+
+
+```{r}
+clientes_novos <- bind_rows(df_clientes_s_fev ,df_clientes_s_mar,df_clientes_s_abr,df_clientes_s_mai,df_clientes_s_jun)
+clientes_sairam_count <- clientes_novos%>% group_by(Meses) %>% count(name = "Quantidade")
+
+```
+
+
+```{r}
+clientes_sairam_count%>% kable() 
+```
+
+
+```{r, out.width="100%"}
+fig_4 <- hchart(clientes_sairam_count, "column", hcaes(x = c('fevereiro','março','abril','maio','junho'), y = Quantidade), name = "clientes que compraram em um unuco mês", color = "red") %>%
+  hc_title(text = "Quantos clientes deixaram a empresa ao longo do tempo?") %>% 
+  hc_xAxis(title = list(text = "Mês")) %>% 
+  hc_yAxis(title = list(text = "Quantidade de clientes que deixaram a empresa ao longo do tempo"))
+
+fig_4
+```
+Observamos que a quantidade de clientes que compraram apenas naquele mês especifico é um pouco grande.
+
+Vamos visualizar um grafico com os dados dos clientes novos e com os cliente que so compraram uma unica vez
+```{r, out.width="100%"}
+fig <- plot_ly()
+fig <- fig %>% add_bars(
+    x = c('fevereiro','marco','abril','maio','junho','total clientes que compraram em um unuco mês'),
+    y = c(clientes_sairam_count$Quantidade, df_clientes_s_fev %>% n_distinct()+ df_clientes_s_mar %>% n_distinct() + df_clientes_s_abr %>% n_distinct()+ df_clientes_s_mai %>% n_distinct()+ df_clientes_s_jun %>% n_distinct()),
+    base = 0,
+    marker = list(
+      color = 'red'
+    ),
+    name = 'clientes que compraram apenas em um unico mês'
+  )
+fig <- fig %>% add_bars(
+    x = c('fevereiro','marco','abril','maio','junho', 'total de clientes novos'),
+  y = c(clientes_novos_count$Quantidade, df_clientes_n_fev %>% n_distinct()+ df_clientes_s_mar %>% n_distinct() + df_clientes_s_abr %>% n_distinct()+ df_clientes_s_mai %>% n_distinct()+ df_clientes_s_jun %>% n_distinct()),
+    base = 0,
+    marker = list(
+      color = 'blue'
+    ),
+    name = 'clientes novos na empresa'
+  )
+
+fig
+```
+* O que da para perceber apartir do grafico?
+   + perceber que o total de novos clientes e de clientes que so fizeram compras em apenas um mês são bem parecidos.
+   + Observamos tambem que no mês de junho a quantidade de novos clientes e de e de clientes que so fizeram compras são bem parecidas, com mais ou menos `1 mil` usuarios.
+ 
+# Tendencias
+
+```{r}
+df_category <- df_data %>% group_by(month=floor_date(purchase_date, "month"), product_category) %>% tally()%>%unique()
+df_nicho <- df_data %>% group_by(month=floor_date(purchase_date, "month"), product_niche) %>% tally()%>%unique()
+```
+## Quais as categorias mais compradas ao longo dos meses ?
+
+As categorias são divididas em 10. vamos visualizar o grafico.
+```{r, out.width="100%"}
+fig_5 <- hchart(df_category, "column", hcaes(x = month, y = n, group = product_category)) %>%
+  hc_title(text = "Quais são as categorias mais compradas ao longo dos meses?") %>% 
+  hc_xAxis(title = list(text = "Meses")) %>% 
+  hc_yAxis(title = list(text = "Frequência")) 
+
+fig_5
+```
+* O que observamos no gráfico?
+  + Existe três categorias mais compradas nos meses.
+    `Podcast`, `Phisical Book`, `Workshop`.
+  + `Phisical Book` é a unica categoria que em todos os meses ela ultrapassa os valores de `150 mil` vendas.
+  + `Video` é a categoria menos vendida entre todas, não passando de `50` vendas nos meses.
+  + `eTicket` e `video` são as categorias que mais tem queda de vendas ao longo dos meses.
+  + A categoria `app` teve um crescimento de vendas a partir do mês de fevereiro. 
+    
+## Quais são os nichos mais vendidos ao longo dos meses?
+
+Os nichos são divididos em 25 tipos. vamos visualizar o grafico.
+```{r, out.width="100%"}
+fig_6 <- hchart(df_nicho, "column", hcaes(x = month, y = n, group = product_niche)) %>%
+  hc_title(text = "Quais são os nichos mais compradas ao longo dos meses?") %>% 
+  hc_xAxis(title = list(text = "Mês")) %>% 
+  hc_yAxis(title = list(text = "Frequência")) 
+
+fig_6
+```
+* O que vemos no gráfico?
+  + `Negociação` e `Anxiety management` são os nichos mais vendidos.
+  + `Negociação` e `Anxiety management` são as únicas que ultrapassam as linha das `40 mil` vendas.
+  + `Immigration` é o nicho com um dos maiores crecimento ao longo dos meses.
+  + `Presentation Skills` e o único nicho que em todos em meses tem basicamente a mesma quantidade de vendas, entre `21 mil` e `26 mil`
+  + `Thermodynamics` é o nicho que menos vendeu ao longo dos meses.
+
+Quais os dispositivos mais utilizados para compras na plataforma?
+
+A base de dados nos da uma lista de 5 dispositivos. Vamos observar o grafico.
+```{r}
+df_count_purchase_device <- df_data %>% group_by(month=floor_date(purchase_date, "month"), purchase_device) %>% tally()
+
+```
+
+```{r, out.width="100%"}
+fig_7 <- hchart(df_count_purchase_device, "column", hcaes(x = month, y = n, group = purchase_device)) %>%
+  hc_title(text = "Quais os dispositivos são mais utilizados a cada mês para compras?") %>% 
+  hc_xAxis(title = list(text = "Mês")) %>% 
+  hc_yAxis(title = list(text = "Frequência")) 
+
+fig_7
+```
+* O que vemos no gráfico?
+  + `Cellphone` e `tablet`são os dispositivos menos utilizados.
+  + `eReaders` é  o dispositivo mais utilizado, ultrapassando a casa `120 mil`. Em seguida vem `Desktop` com a média de `96 mil` dispositivos.
+  + `Smart TV` é o único dispositivo que vem com crescimento.
+
+
+```{r}
+dbDisconnect(cn)
+```
+
