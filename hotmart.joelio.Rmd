@@ -49,15 +49,10 @@ Toda empresa tem um sistema para gerenciar suas vendas. Na Hotmart não é difer
 df_inicial <- dbGetQuery(cn, "SELECT * FROM sales_data")
 ```
 
-```{r}
-df_data <-df_inicial
-df_data["purchase_date"] <- as.Date(df_data$purchase_date)
-```
-
 ## Iniciando a base de dados
-Durante sua avaliação, você irá analisar dados referentes a uma amostra de compras
+Durante a avaliação, iremos analisar dados referentes a uma amostra de compras
 feitas na Hotmart em 2016. Tratam-se de mais de `1.599.828 registros` de compras
-realizadas em nossa plataforma. Abaixo, nós iremos detalhar o que significa cada
+realizadas na plataforma. Abaixo, nós iremos detalhar o que significa cada
 campo:
 
   * `purchase_id:` Identificação da compra na Hotmart;
@@ -87,11 +82,21 @@ campo:
 <button class="btn btn-primary" data-toggle="collapse" data-target="#distp"> Visualize parte da tabela.</button>
 <div id="distp" class="collapse"> 
 ```{r}
-df_data%>% head(10)%>% kable() 
+df_inicial%>% head(10)%>% kable() 
 ```
 </div>
+## Sumario
+```{r}
+summary(df_inicial)
+```
+O que percebemos no sumario?
+ + As colunas `purchase_date` e `product_creation_date` estão com formato de character em vez de data.
+ + A coluna `affiliate_commission_percentual` contém `199` registros `NA`.
 
-
+```{r}
+df_data <-df_inicial
+df_data["purchase_date"] <- as.Date(df_data$purchase_date)
+```
 ## Quantos venda contem a base de dados?
 ```{r}
 df_inicial%>% n_distinct()
