@@ -293,10 +293,35 @@ fig
 # Tendencias
 
 ```{r}
+df_purchase_origin <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), purchase_origin) %>% tally(name = "Quantidade")%>%unique()
+```
+```{r}
+df_purchase_origin%>% filter(purchase_origin== "Origin 000b")
+```
+df_maior_vendas <- df_maior_vendas %>% arrange(desc(Faturamento))
+```{r}
+df_maior_vendas <- df_ajustado %>% group_by(producer_id) %>% summarise(Faturamento = mean(purchase_value))
+df_maior_vendas
+```
+```{r, out.width="100%"}
+fig_7 <- hchart(df_maior_vendas, "column", hcaes(x = as.character(producer_id), y = Faturamento), name = "clientes que compraram em um unuco mês", color = "red") %>%
+  hc_title(text = "Quantos clientes deixaram a empresa ao longo do tempo?") %>% 
+  hc_xAxis(title = list(text = "Mês")) %>% 
+  hc_yAxis(title = list(text = "Quantidade de clientes que deixaram a empresa ao longo do tempo"))
+
+fig_7
+```
+
+```{r}
 df_category <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), product_category) %>% tally()%>%unique()
 df_nicho <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), product_niche) %>% tally()%>%unique()
 ```
 ## Quais as categorias mais compradas ao longo dos meses ?
+```{r}
+hc <- highchart(type = "stock") %>% 
+   hc_add_series(df_category, type = "line",hcaes(x = month, y = n, group = product_category))
+hc
+```
 
 As categorias são divididas em 10. vamos visualizar o grafico.
 ```{r, out.width="100%"}
