@@ -93,36 +93,39 @@ O que percebemos no sumario?
  + As colunas `purchase_date` e `product_creation_date` estão com formato de character em vez de data.
  + A coluna `affiliate_commission_percentual` contém `199` registros `NA`.
 
+Como todo `NA` pode ser considerado um possivel erro, incluimos as 199 linhas que contem `NA` nos criterios de exclusão.
 ```{r}
-df_data <-df_inicial
-df_data["purchase_date"] <- as.Date(df_data$purchase_date)
+df_ajustado <- df_inicial
+df_ajustado["purchase_date"] <- as.Date(df_ajustado$purchase_date)
+df_ajustado["product_creation_date"] <- as.Date(df_ajustado$product_creation_date)
+df_ajustado <- na.omit(df_ajustado)
 ```
 ## Quantos venda contem a base de dados?
 ```{r}
-df_inicial%>% n_distinct()
+df_ajustado%>% n_distinct()
 ```
 ## Quantos produtos diferentes existe na base de dados?
 ```{r}
-df_inicial$product_id%>% n_distinct()
+df_ajustado$product_id%>% n_distinct()
 ```
 ## Quantos afiliados existe na base de dados?
 ```{r}
-df_inicial$affiliate_id%>% n_distinct()
+df_ajustado$affiliate_id%>% n_distinct()
 ```
 ## Quantos compradores existe no sistema?
 ```{r}
-df_inicial$buyer_id%>% n_distinct()
+df_ajustado$buyer_id%>% n_distinct()
 ```
 ## Quantas categorias existem na base de dados?
 ```{r}
-df_inicial$product_category %>% n_distinct()
+df_ajustado$product_category %>% n_distinct()
 ```
 # Vendas
 
 ## PRODUTOS MAIS VENDIDOS
 
 ```{r}
-df_produto_vendas <- df_inicial %>% group_by(producer_id,product_id) %>% count(name = "vendas_produto") %>% arrange(desc(vendas_produto))
+df_produto_vendas <- df_ajustado %>% group_by(producer_id,product_id) %>% count(name = "vendas_produto") %>% arrange(desc(vendas_produto))
 
 ```
 Aqui veremos uma lista dos 10 produtos mais vendidos.
@@ -135,7 +138,7 @@ df_produto_vendas%>% head(10)%>% kable()
 
 Como na base de dados não é fornecido os valores reais do produto, não sera possivel saber se os produtores que mais vendem são responsáveis pela maior parte do faturamento.
 ```{r}
-df_produtor_vendas = df_inicial %>% group_by(producer_id) %>% count(name = "vendas_do_criador") %>% arrange(desc(vendas_do_criador))
+df_produtor_vendas = df_ajustado %>% group_by(producer_id) %>% count(name = "vendas_do_criador") %>% arrange(desc(vendas_do_criador))
 ```
 
 
@@ -154,7 +157,7 @@ fig_1
 
 ## Quantas vendas aconteceram através do afiliado e do produtor?
 ```{r}
-df_quant_commission<- data.frame(Vendas = c("Afiliado", "Produtor"),quantidade = c(df_data %>% filter(affiliate_commission_percentual!= 0) %>% n_distinct(),df_data %>% filter(affiliate_commission_percentual== 0) %>% n_distinct()))
+df_quant_commission<- data.frame(Vendas = c("Afiliado", "Produtor"),quantidade = c(df_ajustado %>% filter(affiliate_commission_percentual!= 0) %>% n_distinct(),df_ajustado %>% filter(affiliate_commission_percentual== 0) %>% n_distinct()))
 ```
 
 ```{r, out.width="100%"}
@@ -169,8 +172,8 @@ Podemos perceber que a quantidade de vendas de afiliados `27%` das vendas em rel
 
 # Clientes
 ```{r}
-df_meses<-df_data
-df_meses['Meses']<-  month(df_data$purchase_date)
+df_meses<-df_ajustado
+df_meses['Meses']<-  month(df_meses$purchase_date)
 ```
 
 
@@ -290,8 +293,8 @@ fig
 # Tendencias
 
 ```{r}
-df_category <- df_data %>% group_by(month=floor_date(purchase_date, "month"), product_category) %>% tally()%>%unique()
-df_nicho <- df_data %>% group_by(month=floor_date(purchase_date, "month"), product_niche) %>% tally()%>%unique()
+df_category <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), product_category) %>% tally()%>%unique()
+df_nicho <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), product_niche) %>% tally()%>%unique()
 ```
 ## Quais as categorias mais compradas ao longo dos meses ?
 
@@ -334,7 +337,7 @@ Quais os dispositivos mais utilizados para compras na plataforma?
 
 A base de dados nos da uma lista de 5 dispositivos. Vamos observar o grafico.
 ```{r}
-df_count_purchase_device <- df_data %>% group_by(month=floor_date(purchase_date, "month"), purchase_device) %>% tally()
+df_count_purchase_device <- df_ajustado %>% group_by(month=floor_date(purchase_date, "month"), purchase_device) %>% tally()
 
 ```
 
